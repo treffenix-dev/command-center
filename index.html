@@ -358,19 +358,40 @@ body.ws-jamie .tab.active{background:rgba(94,234,212,.06)}
 }
 .fab:hover{transform:scale(1.08) rotate(90deg)}
 
-.link-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-top:16px}
+.link-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:16px}
 .link-card{
   display:flex;align-items:center;gap:12px;padding:14px 16px;
   background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);
-  transition:all .15s;
+  transition:all .15s;text-decoration:none;color:inherit;
 }
-.link-card:hover{background:var(--surface-hi);border-color:var(--accent-dim);transform:translateY(-1px)}
+@media(hover:hover){
+  .link-card:hover{background:var(--surface-hi);border-color:var(--accent-dim);transform:translateY(-1px)}
+}
 .link-icon{
   width:36px;height:36px;border-radius:8px;background:var(--bg-3);
   display:grid;place-items:center;font-size:13px;flex-shrink:0;font-weight:700;font-family:var(--mono);
 }
-.link-name{font-weight:600;font-size:13px;line-height:1.2}
-.link-type{font-size:11px;color:var(--text-mute);margin-top:2px}
+.link-name{font-weight:600;font-size:13px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.link-type{font-size:11px;color:var(--text-mute);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Edit-Mode für Quick Links */
+.link-card-edit{
+  cursor:pointer;border-style:dashed;border-color:rgba(232,168,69,.4);
+  background:var(--surface);
+}
+.link-card-edit:hover{
+  border-color:var(--ws-accent);background:var(--surface-hi);
+}
+.link-edit-icons{display:flex;gap:4px;flex-shrink:0}
+.ql-edit-badge{
+  width:24px;height:24px;border-radius:6px;
+  display:grid;place-items:center;
+  background:var(--bg-3);border:1px solid var(--line);
+  font-size:11px;cursor:pointer;color:var(--text-dim);
+  transition:all .12s;
+}
+.ql-edit-badge:hover{background:var(--ws-accent);color:#1a1200;border-color:var(--ws-accent)}
+.ql-edit-badge.danger:hover{background:var(--red);color:#fff;border-color:var(--red)}
 
 .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--text-mute);flex-shrink:0}
 .status-dot.new{background:var(--text-mute)}
@@ -1064,6 +1085,8 @@ function switchWorkspace(w){
 // === NAVIGATION ===
 // ========================================
 function switchPage(page){
+  // Edit-Modes von vorheriger Seite zurücksetzen
+  window._qlEditMode = false;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active', p.dataset.page===page));
   if(window.innerWidth < 1024) document.getElementById('sidebar').classList.remove('open');
@@ -4364,42 +4387,75 @@ function getQuickLinks(){
 function renderQuickLinks(){
   const root = document.getElementById('pg-quicklinks');
   const ql = getQuickLinks();
+  const editMode = !!window._qlEditMode;
+
   root.innerHTML = `
     <div class="page-head">
-      <div><h1 class="page-title">Quick <span class="accent">Links</span></h1><p class="page-sub">Plattformen, Tools, Behörden – komplett anpassbar.</p></div>
+      <div><h1 class="page-title">Quick <span class="accent">Links</span></h1><p class="page-sub">${editMode ? '🛠 Bearbeiten-Modus aktiv – Karten sind nicht mehr klickbar.' : 'Klick auf eine Karte öffnet den Link in einem neuen Tab.'}</p></div>
       <div class="flex-gap">
-        <button class="btn" onclick="addQuickLinkCategory()">+ Neue Kategorie</button>
-        <button class="btn" onclick="resetQuickLinks()" title="Auf Vorlage zurücksetzen">↻ Standard</button>
+        ${editMode
+          ? `<button class="btn btn-primary" onclick="window._qlEditMode=false;renderQuickLinks();" data-tip="Bearbeiten beenden – Karten werden wieder klickbar" data-tip-pos="bottom">✓ Fertig</button>`
+          : `<button class="btn" onclick="window._qlEditMode=true;renderQuickLinks();" data-tip="Bearbeiten-Modus: Links hinzufügen, ändern, löschen" data-tip-pos="bottom">✎ Bearbeiten</button>`
+        }
       </div>
     </div>
-    ${ql.length === 0 ? `<div class="empty"><div class="empty-ic">⚡</div><div>Noch keine Quick Links.</div><button class="btn btn-primary mt-2" onclick="addQuickLinkCategory()">+ Erste Kategorie</button></div>` : ''}
+
+    ${editMode ? `
+      <div style="background:rgba(232,168,69,.08);border:1px solid rgba(232,168,69,.3);border-radius:8px;padding:12px 14px;margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px;font-size:13px;color:var(--text-dim)">
+          <strong style="color:var(--ws-accent)">🛠 Bearbeiten-Modus aktiv.</strong>
+          Du kannst neue Links anlegen, vorhandene ändern und Kategorien verwalten.
+          Wenn du fertig bist, klick oben auf <strong>✓ Fertig</strong>.
+        </div>
+        <div class="flex-gap" style="gap:6px">
+          <button class="btn btn-sm" onclick="addQuickLinkCategory()" data-tip="Neue Kategorie / Spalte anlegen" data-tip-pos="bottom">+ Kategorie</button>
+          <button class="btn btn-sm" onclick="resetQuickLinks()" data-tip="Alle Quick Links auf die Original-Vorlage zurücksetzen" data-tip-pos="bottom">↻ Standard</button>
+        </div>
+      </div>
+    ` : ''}
+
+    ${ql.length === 0 ? `
+      <div class="empty">
+        <div class="empty-ic">⚡</div>
+        <div>Noch keine Quick Links angelegt.</div>
+        <button class="btn btn-primary mt-2" onclick="window._qlEditMode=true;addQuickLinkCategory()">+ Erste Kategorie anlegen</button>
+      </div>
+    ` : ''}
+
     ${ql.map((g, gIdx)=>`
       <div class="ql-cat-block" style="margin-top:24px">
         <div class="flex-between mb-1" style="align-items:center;flex-wrap:wrap;gap:8px">
-          <h2 class="text-serif" style="font-size:22px;font-weight:600;margin:0">${esc(g.cat)}</h2>
-          <div class="flex-gap" style="gap:4px">
-            <button class="act-mini-btn" onclick="addQuickLinkItem(${gIdx})" title="Link in dieser Kategorie hinzufügen">+ Link</button>
-            <button class="act-mini-btn" onclick="renameQuickLinkCategory(${gIdx})" title="Kategorie umbenennen">✎</button>
-            <button class="act-mini-btn danger" onclick="deleteQuickLinkCategory(${gIdx})" title="Kategorie löschen">🗑</button>
-          </div>
+          <h2 class="text-serif" style="font-size:22px;font-weight:600;margin:0">${esc(g.cat)} <span style="font-family:var(--mono);font-size:12px;color:var(--text-mute);font-weight:400">${g.items.length}</span></h2>
+          ${editMode ? `<div class="flex-gap" style="gap:4px">
+            <button class="act-mini-btn" onclick="addQuickLinkItem(${gIdx})" data-tip="Neuen Link in '${esc(g.cat)}' anlegen" data-tip-pos="bottom">+ Link</button>
+            <button class="act-mini-btn" onclick="renameQuickLinkCategory(${gIdx})" data-tip="Kategorie umbenennen" data-tip-pos="bottom">✎</button>
+            <button class="act-mini-btn danger" onclick="deleteQuickLinkCategory(${gIdx})" data-tip="Kategorie inkl. aller Links löschen" data-tip-pos="bottom">🗑</button>
+          </div>` : ''}
         </div>
-        ${g.items.length === 0 ? `<div class="text-xs text-mute" style="padding:14px 0">Noch keine Links. <a href="#" onclick="event.preventDefault();addQuickLinkItem(${gIdx})" style="color:var(--ws-accent)">+ Link hinzufügen</a></div>` : `
-        <div class="link-grid">
-          ${g.items.map((l, iIdx)=>`
-            <div class="link-card" style="position:relative;display:flex;align-items:center;gap:12px;padding:14px">
-              <a href="${esc(l.url)}" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;min-width:0">
-                <div class="link-icon">${esc(l.icon||'?')}</div>
-                <div style="min-width:0;flex:1">
-                  <div class="link-name">${esc(l.name)}</div>
-                  <div class="link-type">${esc(l.type||'')}</div>
-                </div>
-              </a>
-              <div style="display:flex;gap:2px;flex-shrink:0">
-                <button class="act-mini-btn" onclick="editQuickLinkItem(${gIdx},${iIdx})" title="Bearbeiten">✎</button>
-                <button class="act-mini-btn danger" onclick="deleteQuickLinkItem(${gIdx},${iIdx})" title="Löschen">✕</button>
-              </div>
-            </div>`).join('')}
-        </div>`}
+        ${g.items.length === 0
+          ? `<div class="text-xs text-mute" style="padding:14px 0;font-style:italic">Noch keine Links in dieser Kategorie.${editMode ? ` <a href="#" onclick="event.preventDefault();addQuickLinkItem(${gIdx})" style="color:var(--ws-accent);font-style:normal">+ Link hinzufügen</a>` : ''}</div>`
+          : `<div class="link-grid">
+              ${g.items.map((l, iIdx)=> editMode
+                ? `<div class="link-card link-card-edit" data-tip="Klick zum Bearbeiten" data-tip-pos="bottom" onclick="editQuickLinkItem(${gIdx},${iIdx})">
+                    <div class="link-icon">${esc(l.icon||'?')}</div>
+                    <div style="min-width:0;flex:1">
+                      <div class="link-name">${esc(l.name)}</div>
+                      <div class="link-type">${esc(l.type||'')}</div>
+                    </div>
+                    <div class="link-edit-icons">
+                      <span class="ql-edit-badge" data-tip="Diesen Link bearbeiten" data-tip-pos="left" onclick="event.stopPropagation();editQuickLinkItem(${gIdx},${iIdx})">✎</span>
+                      <span class="ql-edit-badge danger" data-tip="Diesen Link löschen" data-tip-pos="left" onclick="event.stopPropagation();deleteQuickLinkItem(${gIdx},${iIdx})">✕</span>
+                    </div>
+                  </div>`
+                : `<a class="link-card" href="${esc(l.url)}" target="_blank" rel="noopener" data-tip="${esc(l.url)}" data-tip-pos="bottom">
+                    <div class="link-icon">${esc(l.icon||'?')}</div>
+                    <div style="min-width:0;flex:1">
+                      <div class="link-name">${esc(l.name)}</div>
+                      <div class="link-type">${esc(l.type||'')}</div>
+                    </div>
+                  </a>`
+              ).join('')}
+            </div>`}
       </div>
     `).join('')}
   `;
